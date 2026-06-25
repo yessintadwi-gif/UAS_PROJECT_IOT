@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Pro - Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f0f3fb; color: #334155; padding: 30px; display: flex; justify-content: center; }
+        
+        /* Main Frame Dashboard */
+        .dashboard-container { width: 900px; background-color: #ffffff; border-radius: 16px; overflow: hidden; padding: 25px; box-shadow: 0 10px 30px rgba(135, 148, 195, 0.15); border: 1px solid #e2e8f0; }
+        
+        /* Header Top Bar Elegan */
+        .dashboard-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid #f1f5f9; }
+        .dashboard-header h2 { color: #6259ca; font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+        .dashboard-header p { font-size: 13px; color: #94a3b8; margin-top: 2px; }
+
+        /* Grid Layout Utama */
+        .grid-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        
+        /* Card Panel */
+        .card-panel { background-color: #ffffff; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02); display: flex; flex-direction: column; gap: 15px; }
+        .card-panel h3 { font-size: 16px; color: #475569; font-weight: 600; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 5px; }
+        
+        /* Container Tombol */
+        .btn-group { display: flex; flex-direction: column; gap: 12px; justify-content: center; height: 100%; }
+        
+        /* Desain Tombol Kontrol Lampu */
+        .btn-control { width: 100%; text-align: center; font-size: 15px; font-weight: 600; padding: 14px; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; border: 1px solid #cbd5e1; }
+        .btn-all-on { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); color: #15803d; border-color: #bbf7d0; }
+        .btn-all-on:hover { background: #15803d; color: #ffffff; transform: translateY(-1px); }
+        .btn-all-off { background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); color: #991b1b; border-color: #fecaca; }
+        .btn-all-off:hover { background: #991b1b; color: #ffffff; transform: translateY(-1px); }
+
+        /* Status Teks Monitor Box (Besar & Jelas) */
+        .status-box { padding: 16px; border-radius: 8px; font-size: 15px; font-weight: 600; text-align: center; border: 1px solid #e2e8f0; transition: all 0.3s ease; }
+        
+        /* Variasi Warna Status Dingin/Aman/Standby */
+        .status-normal { background-color: #f8fafc; color: #64748b; border-left: 5px solid #cbd5e1; }
+        .status-cerah { background-color: #fffbeb; color: #d97706; border-left: 5px solid #f59e0b; }
+        
+        /* Variasi Warna Status Aktif Perangkat */
+        .status-hujan { background-color: #eff6ff; color: #1d4ed8; border-left: 5px solid #3b82f6; font-weight: 700; animation: blink 2s infinite; }
+        .status-basah { background-color: #f0fdf4; color: #166534; border-left: 5px solid #22c55e; }
+        .status-kering { background-color: #faf5ff; color: #6b21a8; border-left: 5px solid #a855f7; }
+
+        @keyframes blink { 50% { opacity: 0.8; } }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <div>
+            <h2>Dashboard Smart Home</h2>
+            <p>Sistem monitoring infografis cuaca jemuran, pemilah sampah, dan sakelar lampu</p>
+        </div>
+    </div>
+
+    <div class="grid-layout">
+        <div class="card-panel">
+            <h3>💡 Manajemen Kontrol 3 Lampu Utama</h3>
+            <div class="btn-group">
+                <button class="btn-control btn-all-on" onclick="kirimPerintah('4')">Nyalakan Semua Lampu</button>
+                <button class="btn-control btn-all-off" onclick="kirimPerintah('5')">Matikan Semua Lampu</button>
+            </div>
+        </div>
+
+        <div class="card-panel">
+            <h3>📊 Indikator Status Aktivitas Alat</h3>
+            
+            <div id="boxCuaca" class="status-box status-cerah">
+                Kondisi Cuaca: <span id="textCuaca">Cerah / Kering</span>
+            </div>
+
+            <div id="boxSampah" class="status-box status-normal">
+                Sistem Sampah: <span id="textSampah">Standby / Menunggu Objek...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    const socket = io();
+
+    // Menangkap sinyal data dari Arduino untuk memperbarui tulisan status langsung
+    socket.on("statusSistem", (res) => {
+        const msg = res.message;
+        
+        const boxCuaca = document.getElementById("boxCuaca");
+        const textCuaca = document.getElementById("textCuaca");
+        
+        const boxSampah = document.getElementById("boxSampah");
+        const textSampah = document.getElementById("textSampah");
+
+        // 1. Logika Analisis Status Cuaca Jemuran
+        if (msg.includes("Hujan Terdeteksi") || msg.includes("Relay Hujan: BASAH")) {
+            textCuaca.textContent = "Sedang Hujan! (Jemuran Menutup)";
+            boxCuaca.className = "status-box status-hujan";
+        } 
+        else if (msg.includes("Cuaca Kering") || msg.includes("Relay Hujan: KERING")) {
+            textCuaca.textContent = "Cerah / Kering (Jemuran Terbuka)";
+            boxCuaca.className = "status-box status-cerah";
+        }
+
+        // 2. Logika Analisis Status Pemilah Sampah
+        if (msg.includes("Terdeteksi BASAH")) {
+            textSampah.textContent = "Membaca Sampah BASAH! Memilah ke Kiri...";
+            boxSampah.className = "status-box status-basah";
+        } 
+        else if (msg.includes("Terdeteksi KERING")) {
+            textSampah.textContent = "Membaca Sampah KERING! Memilah ke Kanan...";
+            boxSampah.className = "status-box status-kering";
+        } 
+        else if (msg.includes("Pembuangan Selesai") || msg.includes("Servo Trash Standby")) {
+            textSampah.textContent = "Standby / Menunggu Objek...";
+            boxSampah.className = "status-box status-normal";
+        }
+    });
+
+    // Fungsi transmisi HTTP POST mengirim kode perintah 4 atau 5
+    function kirimPerintah(angka) {
+        console.log("Mengirim kode perintah: " + angka);
+        fetch("/arduinoApi", {
+            method: "POST",
+            body: JSON.stringify({ data: angka }),
+            headers: { "Content-Type": "application/json" }
+        })
+        .then(res => res.json())
+        .then(hasil => console.log("Response server:", hasil))
+        .catch(err => console.log("Gagal transmisi data:", err));
+    }
+</script>
+
+</body>
+</html>
