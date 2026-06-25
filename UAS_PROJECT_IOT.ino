@@ -17,6 +17,27 @@ int sudutBuka = 0;
 unsigned long waktuLamaCuaca = 0; // Pembatas waktu baca sensor hujan
 
 // =================================================
+// DEKLARASI TEMPAT SAMPAH PINTAR (PIN 7, 8, 9, A0)
+// =================================================
+Servo servoTrash;
+const int pin ServoTrash = 7; // Servo Sampah -> Pin D7
+const int trigpin = 8;        // Ultrasonik Trig -> Pin D8
+const int echopin = 9;        // Ultrasonik Echo -> Pin D9
+const int soilPIN = A0;       // Sensor Kelembaban -> Pin A0
+
+long duration;
+int distance;
+int soil;
+int fsoil;
+
+int maxDryValue = 10;     // Batas Kelembaban sampah (> 10% = basah)
+int Ultra_Distance = 15;  // Jarak deteksi objek (15 cm)
+
+unsigned long waktuMulaiTrash = 0;
+unsigned long waktuLamaUltrasonik = 0;
+bool trashSedangMemisah = false;
+
+// =================================================
 // DEKLARASI KONTROL 3 LAMPU LED (PIN 10, 11, 12)
 // =================================================
 const int led_1 = 10; // LED 1 ➔ Pin D10
@@ -29,7 +50,6 @@ unsigned long waktuLamaCetak = 0;
 // ===============================
 // SETUP
 // ===============================
-
 void setup() {
   Serial.begin(9600);
 
@@ -47,6 +67,12 @@ void setup() {
     statusJemuranTerakhir = 0;
   }
   delay(500);
+
+  // --- SETUP SMART TRASH ---
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, OUTPUT);
+  servoTrash.attach(pinServoTrash);
+  servoTrash,write(90); //Posisi standby tengah
 
   // --- SETUP LAMPU ---
   pinMode(led_1, OUTPUT);
@@ -90,6 +116,52 @@ void loop() {
     waktuLamaCuaca = millis();
   }
 
+// TEMPAT SAMPAH PINTAR (MEMISAH)
+if (millis() - waktuLamaUltrasonik >= 200 && !trashSedangMemisah)
+{
+  digitalWrite(trigpin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigpin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigpin, LOW);
+
+  duration = PulseIn(echoPin, HIGH, 26000);
+  distance = duration *0.034 / 2;
+  waktuLamaUltrasonik = millis();
+
+  if (distance < Ultra_Distance && distance > 1)
+  {
+    delay(75);
+    soil = analogRead(soilPin);
+    soil = constrain (soil, 485, 1023);
+    fsoil = map(soil, 485, 1023, 100, 0);
+
+    if (fsoil > maxDryValue)
+    {
+      Serial.print("-> [SAMPAH] Terdeteksi BASAH(");
+      Serial.print(fsoil);
+      Serial.println("%).Memilah ke KIRI (10 derajat).");
+      servoTrash.write(10)
+    }
+    else
+    {
+      Serial.print("-> [SAMPAH] Terdeteksi KERING(");
+      Serial.print(fsoil);
+      Serial.println("%). Memilah ke KANAN (170 derajat).");
+      servoTrash.write (170);
+    }
+
+    waktuMulaiTrash = millis();
+    trashSedangMemisah = true;
+  }
+}
+
+if (trashSedangMemisah && (millis() - waktuMulaiTrash)) {
+  servoTrash.write(90);
+  trashSedangMemisah = false;
+  Serial.println("-> [SAMPAH] Selesai. Servo Trash Standby (90 derajat).");
+}
+  
 // SERIAL KONTROL 3 LAMPU (LOGIKA RESERVED)
 if (Serial.available() > 0)
 {
